@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<launch>
+
+  <!-- Start the fixed-orientation drone frame publisher node -->
+  <node name="drone_frame_broadcaster" pkg="interface_code" type="fixed_orientation_drone_frame.py" respawn="true" output="screen" />
+
+</launch>

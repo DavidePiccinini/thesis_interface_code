@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<launch>
+
+  <!-- Start the closest obstacle detection node -->
+  <node name="closest_obstacle_detection" pkg="interface_code" type="closest_obstacle_detection.py" respawn="true" output="screen" />
+
+</launch>
