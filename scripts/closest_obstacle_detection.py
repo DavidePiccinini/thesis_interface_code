@@ -31,7 +31,7 @@ objectInfo = ClosestObstacleInfo()
 numSectors = 5
 
 ## Possible positions
-positions = ["Left", "Front-left", "Front", "Front-right", "Right"]
+positions = ["left", "front-left", "front", "front-right", "right"]
 
 ## Setup variable
 doSetup = True
@@ -62,7 +62,7 @@ positionIndex = 0
 # obstacle (distance and qualitative position) are then published on their
 # respective topics.
 #
-# @param scan The LaserScan message
+# @param scan The LaserScan message.
 def detect_closest_obstacle(scan):
     global radToDegRatio
     global updatedScan, objectInfo
