@@ -12,12 +12,16 @@
 
 import rospy
 import math
+import datetime
+import time
 import os
 import threading
 import csv
 import tf_conversions
 from nav_msgs.msg import Odometry
 from interface_code.msg import ClosestObstacleInfo
+from aruco_msgs.msg import IdentifiedMarkersIDs
+from colorama import Fore, Back, Style
 
 ## Ratio to convert rad to deg
 radToDegRatio = 180 / math.pi
@@ -26,6 +30,8 @@ radToDegRatio = 180 / math.pi
 odometryReceived = threading.Event()
 ## Threading event
 infoReceived = threading.Event()
+## Threading event
+idsReceived = threading.Event()
 
 ## Odometry variable
 dronePosition = None
@@ -42,6 +48,9 @@ droneAngVelDeg = None
 obstacleDistance = None
 ## Obstacle info variable
 obstaclePosition = None
+
+## Marker IDs variable
+markerIDs = None
 
 
 ##
@@ -88,26 +97,61 @@ def obstacle_info_callback(infoMsg):
 
 
 ##
+# @brief The callback function for the @c '/aruco_marker_publisher/identified_marker_ids'
+#        topic.
+# 
+# @param idsMsg The int32[] message.
+def marker_ids_callback(idsMsg):
+    global markerIDs
+    
+    # Process the message only when the previous one has been logged
+    if not idsReceived.is_set():
+        if not idsMsg.ids:
+            markerIDs = "none"
+        else:
+            markerIDs = str(idsMsg.ids)
+        
+        # Set the flag to true
+        idsReceived.set()
+
+
+##
 # @brief This function simply prints the important information about the
 #        drone state in an user-friendly way.
 def print_feedback():
     global dronePosition, droneAttitudeDeg, droneLinVel, droneAngVelDeg
     global obstacleDistance, obstaclePosition
+    global markerIDs
+    
+    # Threshold in meters after which the terminal warns the pilot
+    distanceThreshold = 1.5
     
     # Print on the terminal the information that is useful to the pilot
     print("The current position (in meters) of the drone is:")
-    print("* x: " + str(round(dronePosition.x, 2)) + "\n* y: " + str(round(dronePosition.y, 2)) + "\n* z: " + str(round(dronePosition.z, 2)))
+    print(Style.BRIGHT + "* x: " + str(round(dronePosition.x, 2)) + "\n* y: " + str(round(dronePosition.y, 2)) + "\n* z: " + str(round(dronePosition.z, 2)) + Style.RESET_ALL)
     print
     print("The current yaw attitude (in degrees) of the drone is:")
-    print("* Yaw: " + str(round(droneAttitudeDeg[2], 2)))
+    print(Style.BRIGHT + "* Yaw: " + str(round(droneAttitudeDeg[2], 2)) + Style.RESET_ALL)
     print
     print("The current linear velocity (in m/s) of the drone is:")
-    print("* Velocity in x: " + str(round(droneLinVel.x, 2)) + "\n* Velocity in y: " + str(round(droneLinVel.y, 2)) + "\n* Velocity in z: " + str(round(droneLinVel.z, 2)))
+    print(Style.BRIGHT + "* Velocity in x: " + str(round(droneLinVel.x, 2)) + "\n* Velocity in y: " + str(round(droneLinVel.y, 2)) + "\n* Velocity in z: " + str(round(droneLinVel.z, 2)) + Style.RESET_ALL)
     print
     print("The current yaw angular velocity (in deg/s) of the drone is:")
-    print("* Rotation about the Z axis: " + str(round(droneAngVelDeg.z, 2)))
+    print(Style.BRIGHT + "* Rotation about the Z axis: " + str(round(droneAngVelDeg.z, 2)) + Style.RESET_ALL)
     print
-    print("The closest obstacle is situated at " + str(round(obstacleDistance, 2)) + " meters on the " + obstaclePosition + " of the drone.")
+    
+    if obstaclePosition == "none":
+        print(Style.BRIGHT + Fore.YELLOW + "There are no detected obstacles at the moment." + Style.RESET_ALL)
+    elif obstacleDistance <= distanceThreshold:
+        print(Style.BRIGHT + Fore.RED + "The closest obstacle is situated at " + str(round(obstacleDistance, 2)) + " meters on the " + obstaclePosition + " of the drone." + Style.RESET_ALL)
+    else:
+        print(Style.BRIGHT + Fore.GREEN + "The closest obstacle is situated at " + str(round(obstacleDistance, 2)) + " meters on the " + obstaclePosition + " of the drone." + Style.RESET_ALL)
+    print
+    
+    if markerIDs == "none":
+        print(Style.BRIGHT + Fore.YELLOW + "There are no identified markers at the moment." + Style.RESET_ALL)
+    else:
+        print(Style.BRIGHT + Fore.GREEN + "The marker(s) with the following ID(s) have been identified: " + markerIDs + Style.RESET_ALL)
 
 
 ##
@@ -115,12 +159,15 @@ def print_feedback():
 def log_feedback():
     global dronePosition, droneAttitudeDeg, droneLinVel, droneAngVelDeg
     global obstacleDistance, obstaclePosition
+    global markerIDs
     
     # Create the list of all data and write it in the log file
+    currentTimestamp = [int(time.time())]
     logDronePose = [str(dronePosition.x), str(dronePosition.y), str(dronePosition.z), str(droneAttitudeDeg[0]), str(droneAttitudeDeg[1]), str(droneAttitudeDeg[2])]
     logDroneVelocities = [str(droneLinVel.x), str(droneLinVel.y), str(droneLinVel.z), str(droneAngVelDeg.x), str(droneAngVelDeg.y), str(droneAngVelDeg.z)]
     logObstacleInfo = [str(obstacleDistance), obstaclePosition]
-    data = logDronePose + logDroneVelocities + logObstacleInfo
+    
+    data = currentTimestamp + logDronePose + logDroneVelocities + logObstacleInfo + [markerIDs]
     outputCsv.writerow(data)
     csvFile.flush()
 
@@ -128,8 +175,9 @@ def log_feedback():
 ##
 # @brief The function that shows the output on the terminal and logs data.
 # 
-# The function waits until both the Odometry and ClosestObstacleInfo messages
-# are received, and then calls the log_feedback and print_feedback functions.
+# The function waits until the Odometry, ClosestObstacleInfo, and
+# IdentifiedMarkersIDs messages are received, and then calls the log_feedback
+# and print_feedback functions.
 def feedback():
     
     # Show feedback every second
@@ -139,9 +187,10 @@ def feedback():
         # Clear the terminal
         os.system("clear")
     
-        # Wait until both messages have been received
+        # Wait until all messages have been received
         odometryReceived.wait()
         infoReceived.wait()
+        idsReceived.wait()
     
         # Log the feedback on a csv file
         log_feedback()
@@ -152,6 +201,7 @@ def feedback():
         # Clear the flags
         odometryReceived.clear()
         infoReceived.clear()
+        idsReceived.clear()
         
         rate.sleep()
         
@@ -169,13 +219,18 @@ if __name__ == '__main__':
 		
     	# Subscribe to the "/closest_obstacle_info" topic
         rospy.Subscriber('/closest_obstacle_info', ClosestObstacleInfo, obstacle_info_callback)
+        
+        # Subscribe to the "/aruco_marker_publisher/identified_marker_ids" topic
+        rospy.Subscriber('/aruco_marker_publisher/identified_marker_ids', IdentifiedMarkersIDs, marker_ids_callback)
 		
 		# Open the log file
         csv_path = rospy.get_param("output_csv_path")
-        csvFile = open(csv_path, 'w')
+        currentDate = datetime.datetime.now()
+        path = csv_path + str(currentDate.year) + "-" + str(currentDate.month) + "-" + str(currentDate.day) + "-" + str(currentDate.hour) + "-" + str(currentDate.minute) + ".csv"
+        csvFile = open(path, 'w')
         outputCsv = csv.writer(csvFile, delimiter=',', quotechar='"')
         # Write the header that defines the contents of the log file
-        header = ["drone_pos_x", "drone_pos_y", "drone_pos_z", "drone_roll", "drone_pitch", "drone_yaw", "drone_lin_vel_x", "drone_lin_vel_y", "drone_lin_vel_z", "drone_ang_vel_x", "drone_ang_vel_y", "drone_ang_vel_z", "closest_obs_distance", "closest_obs_pos"]
+        header = ["timestamp", "drone_pos_x", "drone_pos_y", "drone_pos_z", "drone_roll", "drone_pitch", "drone_yaw", "drone_lin_vel_x", "drone_lin_vel_y", "drone_lin_vel_z", "drone_ang_vel_x", "drone_ang_vel_y", "drone_ang_vel_z", "closest_obs_distance", "closest_obs_pos", "identified_markers_ids"]
         outputCsv.writerow(header)
         csvFile.flush()
         

@@ -93,9 +93,21 @@ def detect_closest_obstacle(scan):
     for item, value in enumerate(ranges):
         ranges[item] = float("inf")
     
-    # Get the distance and the position of the closest obstacle	
+    # Get the distance to the closest obstacle and its position
     closestObstacleDistance = min(scan.ranges)
     positionIndex = scan.ranges.index(closestObstacleDistance)
+    
+    # If there're no detected obstacles then send an appropriate message
+    if closestObstacleDistance == float("inf"):
+        # Publish the updated scan message
+        scanPub.publish(updatedScan)
+    
+        # Initialize the closest object info message and publish it
+        objectInfo.distance = closestObstacleDistance
+        objectInfo.position = "none"
+        obstacleInfoPub.publish(objectInfo)
+    
+    # Keep only the ranges of the sector that contains the closest obstacle
     for i in range(numSectors):
         if positionIndex <= (((i + 1) * sectorRays) - 1):
             closestObstaclePosition = positions[i]
