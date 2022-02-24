@@ -50,7 +50,12 @@ obstacleDistance = None
 obstaclePosition = None
 
 ## Marker IDs variable
-markerIDs = None
+markerIDs = []
+
+## Time variable
+startingTime = None
+## Time variable
+currentTime = None
 
 
 ##
@@ -106,10 +111,10 @@ def marker_ids_callback(idsMsg):
     
     # Process the message only when the previous one has been logged
     if not idsReceived.is_set():
-        if not idsMsg.ids:
-            markerIDs = "none"
-        else:
-            markerIDs = str(idsMsg.ids)
+        if idsMsg.ids:
+            for id in idsMsg.ids:
+                if id not in markerIDs:
+                   markerIDs.append(id)
         
         # Set the flag to true
         idsReceived.set()
@@ -122,11 +127,21 @@ def print_feedback():
     global dronePosition, droneAttitudeDeg, droneLinVel, droneAngVelDeg
     global obstacleDistance, obstaclePosition
     global markerIDs
+    global startingTime, currentTime
     
     # Threshold in meters after which the terminal warns the pilot
     distanceThreshold = 1.5
     
+    # Compute the time elapsed from the start of the experiment
+    currentTime = int(time.time())
+    timePeriod = currentTime - startingTime
+    minutes = int(math.floor(timePeriod / 60))
+    seconds = timePeriod % 60
+    
     # Print on the terminal the information that is useful to the pilot
+    print(Style.BRIGHT + Fore.YELLOW + "Current elapsed time from the start of the experiment:" + Style.RESET_ALL)
+    print(Style.BRIGHT + Fore.YELLOW + "* " + str(minutes) + " minutes and " + str(seconds) + " seconds." + Style.RESET_ALL)
+    print
     print("The current position (in meters) of the drone is:")
     print(Style.BRIGHT + "* x: " + str(round(dronePosition.x, 2)) + "\n* y: " + str(round(dronePosition.y, 2)) + "\n* z: " + str(round(dronePosition.z, 2)) + Style.RESET_ALL)
     print
@@ -148,10 +163,10 @@ def print_feedback():
         print(Style.BRIGHT + Fore.GREEN + "The closest obstacle is situated at " + str(round(obstacleDistance, 2)) + " meters on the " + obstaclePosition + " of the drone." + Style.RESET_ALL)
     print
     
-    if markerIDs == "none":
+    if not markerIDs:
         print(Style.BRIGHT + Fore.YELLOW + "There are no identified markers at the moment." + Style.RESET_ALL)
     else:
-        print(Style.BRIGHT + Fore.GREEN + "The marker(s) with the following ID(s) have been identified: " + markerIDs + Style.RESET_ALL)
+        print(Style.BRIGHT + Fore.GREEN + "The markers with the following IDs have been identified: " + str(markerIDs) + Style.RESET_ALL)
 
 
 ##
@@ -233,6 +248,9 @@ if __name__ == '__main__':
         header = ["timestamp", "drone_pos_x", "drone_pos_y", "drone_pos_z", "drone_roll", "drone_pitch", "drone_yaw", "drone_lin_vel_x", "drone_lin_vel_y", "drone_lin_vel_z", "drone_ang_vel_x", "drone_ang_vel_y", "drone_ang_vel_z", "closest_obs_distance", "closest_obs_pos", "identified_markers_ids"]
         outputCsv.writerow(header)
         csvFile.flush()
+        
+        # Get the starting timestamp
+        startingTime = int(time.time())
         
         # Start showing feedback
         feedback()

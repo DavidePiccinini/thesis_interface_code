@@ -1,0 +1,1 @@
+timestamp,drone_pos_x,drone_pos_y,drone_pos_z,drone_roll,drone_pitch,drone_yaw,drone_lin_vel_x,drone_lin_vel_y,drone_lin_vel_z,drone_ang_vel_x,drone_ang_vel_y,drone_ang_vel_z,closest_obs_distance,closest_obs_pos,identified_markers_ids
