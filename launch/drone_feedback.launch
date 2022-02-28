@@ -2,7 +2,7 @@
 <launch>
 
   <!-- Define the csv file path (write only the prefix, the datetime and the csv extension will be added by the program) -->
-  <param name="output_csv_path" value="$(find interface_code)/log/example"/>
+  <param name="output_csv_path" value="$(find interface_code)/log/part5_outdoor_exo_conf3_"/>
   
   <!-- Start the drone feedback node -->
   <node name="drone_feedback" pkg="interface_code" type="drone_feedback.py" respawn="true" output="screen" />
